@@ -45,4 +45,5 @@ pub extern "C" fn call() {
     let (contracthash, _contractversion) =
         storage::new_contract(entrypoints, None, Some("packagehashname".to_string()), None);
     runtime::put_key("contract", contracthash.into());
+
 }

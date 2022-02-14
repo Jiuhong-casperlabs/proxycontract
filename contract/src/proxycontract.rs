@@ -53,6 +53,7 @@ pub extern "C" fn call() {
     );
     entrypoints.add_entry_point(entrypoint1);
 
-    let (_contracthash, _contractversion) =
+    let (contracthash, _contractversion) =
         storage::new_contract(entrypoints, None, Some("proxyhashname".to_string()), None);
+	runtime::put_key("proxycontract", contracthash.into());
 }
