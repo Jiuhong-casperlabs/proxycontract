@@ -8,17 +8,23 @@ compile_error!("target arch should be wasm32: compile with '--target wasm32-unkn
 // `no_std` environment.
 extern crate alloc;
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec,
+};
 
 use casper_contract::{
     contract_api::{runtime, storage},
     unwrap_or_revert::UnwrapOrRevert,
 };
-use casper_types::{CLType, CLValue, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints};
+use casper_types::{
+    CLType, CLTyped, CLValue, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints, Parameter,
+};
 
 #[no_mangle]
 pub extern "C" fn test() {
-    let ret = CLValue::from_t("helloworld").unwrap_or_revert();
+    let message: String = runtime::get_named_arg("message");
+    let ret = CLValue::from_t(message).unwrap_or_revert();
     runtime::ret(ret);
 }
 
@@ -28,7 +34,7 @@ pub extern "C" fn call() {
 
     let entrypoint = EntryPoint::new(
         "test",
-        Vec::new(),
+        vec![Parameter::new("message", String::cl_type())],
         CLType::Unit,
         EntryPointAccess::Public,
         EntryPointType::Contract,
@@ -36,11 +42,7 @@ pub extern "C" fn call() {
 
     entrypoints.add_entry_point(entrypoint);
 
-    let (contracthash, _contractversion) = storage::new_contract(
-        entrypoints,
-        None,
-        Some("packagehashname".to_string()),
-        None,
-    );
+    let (contracthash, _contractversion) =
+        storage::new_contract(entrypoints, None, Some("packagehashname".to_string()), None);
     runtime::put_key("contract", contracthash.into());
 }

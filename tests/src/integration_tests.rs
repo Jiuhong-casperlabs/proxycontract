@@ -5,18 +5,19 @@ mod tests {
     use casper_engine_test_support::{
         DeployItemBuilder, ExecuteRequestBuilder, InMemoryWasmTestBuilder, ARG_AMOUNT,
         DEFAULT_ACCOUNT_ADDR, DEFAULT_ACCOUNT_INITIAL_BALANCE, DEFAULT_GENESIS_CONFIG,
-        DEFAULT_GENESIS_CONFIG_HASH, DEFAULT_PAYMENT
+        DEFAULT_GENESIS_CONFIG_HASH, DEFAULT_PAYMENT,
     };
     use casper_execution_engine::core::engine_state::{
         run_genesis_request::RunGenesisRequest, GenesisAccount,
     };
     use casper_types::{
-        account::AccountHash, runtime_args, Key, Motes, PublicKey, RuntimeArgs, SecretKey, U512, ContractPackageHash, StoredValue, CLValue,
+        account::AccountHash, runtime_args, CLValue, ContractPackageHash, Key, Motes, PublicKey,
+        RuntimeArgs, SecretKey, StoredValue, U512,
     };
 
     const MY_ACCOUNT: [u8; 32] = [7u8; 32];
     const CONTRACT_WASM: &str = "contract.wasm";
-	const PROXYCONTRACT_WASM: &str = "proxycontract.wasm";
+    const PROXYCONTRACT_WASM: &str = "proxycontract.wasm";
 
     #[test]
     fn should_store_hello_world() {
@@ -45,7 +46,7 @@ mod tests {
         // relative to the current working dir (e.g. 'wasm/contract.wasm') can also be used, as can
         // absolute paths.
 
-		// install contract.wasm
+        // install contract.wasm
         let session_code = PathBuf::from(CONTRACT_WASM);
         let session_args = runtime_args! {};
 
@@ -63,63 +64,85 @@ mod tests {
         let mut builder = InMemoryWasmTestBuilder::default();
         builder.run_genesis(&run_genesis_request).commit();
 
-
         // deploy the contract.
         builder.exec(execute_request).commit().expect_success();
 
 
-		//get account
-		let account = builder
-		.query(None, Key::Account(account_addr), &[])
-		.expect("should query account")
-		.as_account()
-		.cloned()
-		.expect("should be account");
+        // install PROXYCONTRACT
+        let proxy_installer_session_code = PROXYCONTRACT_WASM;
+        let proxy_installer_session_args = runtime_args! {};
+        let installer_payment_args = runtime_args! {
+            ARG_AMOUNT => *DEFAULT_PAYMENT
+        };
+        let deploy_item2 = DeployItemBuilder::new()
+            .with_empty_payment_bytes(installer_payment_args)
+            .with_session_code(proxy_installer_session_code, proxy_installer_session_args)
+            .with_authorization_keys(&[account_addr])
+            .with_address(account_addr)
+            .build();
 
-		//get stored package hash
-		let stored_package_hash: ContractPackageHash = account
-        .named_keys()
-        .get("packagehashname")
-        .expect("should have stored uref")
-        .into_hash()
-        .expect("should have hash")
-        .into();
+        let execute_request2 = ExecuteRequestBuilder::from_deploy_item(deploy_item2).build();
 
-		// call proxycontract.wasm
-		let exec_request = {
+        builder.exec(execute_request2).commit().expect_success();
+        // ~~~~~~~~~~
+        //get account
+        let account = builder
+            .query(None, Key::Account(account_addr), &[])
+            .expect("should query account")
+            .as_account()
+            .cloned()
+            .expect("should be account");
 
-            ExecuteRequestBuilder::standard(
-                *DEFAULT_ACCOUNT_ADDR,
-                &PROXYCONTRACT_WASM,
+        // get named_keys
+        let named_keys = account.named_keys();
+        println!("named_keys are {:?}", named_keys);
+
+		//get stored package key
+		let stored_package_key = account
+		.named_keys()
+		.get("packagehashname")
+		.expect("should have stored uref").clone();
+
+        // call entrypoint 'callme' of proxycontract
+        let deploy = DeployItemBuilder::new()
+            .with_address(account_addr)
+            .with_stored_versioned_contract_by_name(
+                "proxyhashname",
+                None,
+                "callme",
                 runtime_args! {
-                    "packagehash".to_string() => stored_package_hash,
+                    "packagekey".to_string() => stored_package_key,
+                    "message".to_string() => "helloworld",
                 },
             )
-            .build()
-        };
+            .with_empty_payment_bytes(runtime_args! { ARG_AMOUNT => *DEFAULT_PAYMENT, })
+            .with_authorization_keys(&[account_addr])
+            .with_deploy_hash([42; 32])
+            .build();
 
-        builder.exec(exec_request).expect_success().commit();
+        let execute_request = ExecuteRequestBuilder::from_deploy_item(deploy).build();
+        builder.exec(execute_request).commit().expect_success();
+        // `````````````
+        // query stored value under account
+        let account = builder
+            .get_account(*DEFAULT_ACCOUNT_ADDR)
+            .expect("should have account");
 
-		// query stored value under account
-		let account = builder
-        .get_account(*DEFAULT_ACCOUNT_ADDR)
-        .expect("should have account");
+        let retvaluekey = *account
+            .named_keys()
+            .get("retvalue")
+            .expect("version key should exist");
 
-    	let retvaluekey = *account
-        .named_keys()
-        .get("retvalue")
-        .expect("version key should exist");
-
-    	let retvalue = builder
-        .query(None, retvaluekey, &[])
-        .expect("helloworld should exist");
+        let retvalue = builder
+            .query(None, retvaluekey, &[])
+            .expect("helloworld should exist");
 
         // make assertions
-		assert_eq!(
-			retvalue,
-			StoredValue::CLValue(CLValue::from_t("helloworld".to_string()).unwrap()),
-			"should be helloworld"
-		);
+        assert_eq!(
+            retvalue,
+            StoredValue::CLValue(CLValue::from_t("helloworld".to_string()).unwrap()),
+            "should be helloworld"
+        );
     }
 }
 
