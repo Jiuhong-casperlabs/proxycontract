@@ -11,7 +11,7 @@ mod tests {
     };
     use casper_types::{
         account::AccountHash, bytesrepr::ToBytes, runtime_args, CLValue, ContractPackageHash, Key,
-        Motes, PublicKey, RuntimeArgs, SecretKey, URef, U256, U512,
+        Motes, PublicKey, RuntimeArgs, SecretKey, URef, U256, U512, StoredValue,
     };
 
     const ERC20_WASM: &str = "/Users/jiuhong8201/mywork/erc20/target/wasm32-unknown-unknown/release/erc20_token.wasm";
@@ -122,18 +122,18 @@ mod tests {
                 .commit()
                 .expect_success();
 
-				// Check version
-			let ret_value_stored = test_builder
-				.query(
-					None,
-					Key::Account(account_address),
-					&["retvalue".to_string()],
-				)
-				.expect("should query account")
-				.as_cl_value()
-				.cloned()
-				.expect("should be cl value");
-			println!("ret_value_stored is {:?}",ret_value_stored);
+				// Check retvalue
+		let retvalue = test_builder
+        .query(None, retvaluekey, &[])
+        .expect("helloworld should exist");
+
+        // make assertions
+		assert_eq!(
+			retvalue,
+			StoredValue::CLValue(CLValue::from_t("helloworld".to_string()).unwrap()),
+			"should be helloworld"
+		);
+
     }
 }
 
