@@ -55,5 +55,5 @@ pub extern "C" fn call() {
 
     let (contracthash, _contractversion) =
         storage::new_contract(entrypoints, None, Some("proxyhashname".to_string()), None);
-	runtime::put_key("proxycontract", contracthash.into());
+    runtime::put_key("proxycontract", contracthash.into());
 }
