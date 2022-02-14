@@ -42,14 +42,12 @@ mod tests {
         let mut test_builder = InMemoryWasmTestBuilder::default();
         test_builder.run_genesis(&run_genesis_request).commit();
 
-        // ========= install contract start========= //
+        // ========= install contract =========
         let exec_request_1 =
             ExecuteRequestBuilder::standard(account_address, CONTRACT_WASM, runtime_args! {})
                 .build();
 
-        // ========= install contract end========= //
-
-        // ========= install proxy contract start========= //
+        // ========= install proxy contract =========
 
         let exec_request_2 =
             ExecuteRequestBuilder::standard(account_address, PROXYCONTRACT_WASM, runtime_args! {})
@@ -58,7 +56,6 @@ mod tests {
         test_builder.exec(exec_request_1).expect_success().commit();
 
         test_builder.exec(exec_request_2).expect_success().commit();
-        // ========= install proxy contract end========= //
 
         //get account
         let account = test_builder
